@@ -1,21 +1,22 @@
-﻿#Systemowe importy
+﻿#Windows system imports needed for gui
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-#Zmienne
-$Sciezka = "" #Variable to store Path
-$PlikList = @("","") #Variable to store list of files in a folder
-$IleNapisow = 0 #Variable to store amount of subtitles in a file
-$Metadata = "" #Zmienna do parametryzowania dodawania napisow
-$UsunNapisy = "false"
-$SubtitlesMetaDataLanguage = "pol"
-$MetadataLanguage = "language=pol"
-$MetadataHandlerName = "handler_name=Polish"
-$MetadataTitle       = "title=Polski"
-$rozv = "mkv" #rozszerzenie plikow wideo
-$rozs = "srt" #rozszerzenie plikow z napisami
+#Variables
+$DirPath    = ""        #Variable to store Path
+$FileList   = @("","")  #Variable to store list of files found in a directory
+$HowManySubtitles = 0   #Variable to store amount of subtitles in a file
+$Metadata   = ""        #Variable to store metadata stream position - lowers the amount of text in commands
+$RemoveSubtitles = "false" #Variable a boolean switch if you want to remove other subtitles from the container
+$SubtitlesMetaDataLanguage  = "pol"
+$MetadataLanguage           = "language=pol"
+$MetadataHandlerName        = "handler_name=Polish"
+$MetadataTitle              = "title=Polski"
+$extv       = "mkv" #extension for video files
+$exts       = "srt" #extension for subtitle files
+$DeleteSourceFiles          = 1 #Variable to check if you want to delete source files
 
-#Funkcje
-#Sprawdzanie formatu tekstu
+#Functions
+#Checking file encoding
 function Get-Encoding
 {
   param
@@ -55,7 +56,7 @@ function Get-Encoding
   }
 }
 
-#Wybieranie opcji
+#Options Chooser
 Function DropDown {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Select a Computer'
@@ -125,29 +126,29 @@ Function Get-Folder($initialDirectory="D:\test")
     return $folder
 }
 
-#Funkcja ktora zwraca pozycje domyslnych napisow
-Function ZnajdzPozycjeDomyslnychNapisow($PlikWideo)
+#Fucntion that returns position of default subtitles in containerfile
+Function FindPositionOfDefaultSubtitles($FileVideo)
 {
-    $IleStrumieniWideo = (ffmpeg -i $PlikWideo 2>&1 | Select-String "Stream" | Select-String "Video").count
-    $IleStrumieniAudio = (ffmpeg -i $PlikWideo 2>&1 | Select-String "Stream" | Select-String "Audio").count
-    $PozycjaDomyslnychNapisow = (ffmpeg -i $PlikWideo 2>&1 | Select-String "Subtitle" | Select-String "(default)")
-    If ($PozycjaDomyslnychNapisow -ne $null)
+    $HowManyStreamsVideo = (ffmpeg -i $FileVideo 2>&1 | Select-String "Stream" | Select-String "Video").count
+    $HowManyStreamsAudio = (ffmpeg -i $FileVideo 2>&1 | Select-String "Stream" | Select-String "Audio").count
+    $DefaultSubtitlesPosition = (ffmpeg -i $FileVideo 2>&1 | Select-String "Subtitle" | Select-String "(default)")
+    If ($DefaultSubtitlesPosition -ne $null)
     {
-        $PozycjaDomyslnychNapisow = $PozycjaDomyslnychNapisow.ToString()
-        $Index = $PozycjaDomyslnychNapisow.IndexOf(":")
-        $ZwroconaPozycja= $PozycjaDomyslnychNapisow.Substring($Index+1,1)
-        $ZwroconaPozycja = $ZwroconaPozycja - ($IleStrumieniWideo + $IleStrumieniAudio)
+        $DefaultSubtitlesPosition = $DefaultSubtitlesPosition.ToString()
+        $Index = $DefaultSubtitlesPosition.IndexOf(":")
+        $ReturnedPosition= $DefaultSubtitlesPosition.Substring($Index+1,1)
+        $ReturnedPosition = $ReturnedPosition - ($HowManyStreamsVideo + $HowManyStreamsAudio)
     }
     else 
     {
-        $ZwroconaPozycja = 0
-        Write-Host "Jest null takze zwrocona pozycja = $($ZwroconaPozycja)"
+        $ReturnedPosition = 0
+        Write-Host "There are no default subtitles so returned position is: $($ReturnedPosition)"
     }
-    Return $ZwroconaPozycja
+    Return $ReturnedPosition
 }
 
 #Funkcja do szybkiej zmiany metadanych jezyka napisów
-Function ZmianaJezyka($LangCode)
+Function ChangeSubtitleMetadataLang($LangCode)
 {
     Switch ($LangCode)
     {
@@ -166,54 +167,58 @@ Function ZmianaJezyka($LangCode)
     } 
 }
 
-#Kod
-$Sciezka = Get-Folder
-cd $Sciezka
-$PlikList = Get-ChildItem -Path $Sciezka -Filter "*.$($rozv)" -Name
-foreach($Plik in $PlikList)
+#Code
+$DirPath = Get-Folder
+cd $DirPath
+$FileList = Get-ChildItem -Path $DirPath -Filter "*.$($extv)" -Name
+foreach($File in $FileList)
 {
-    $IleNapisow = (ffmpeg -i $Plik 2>&1 | Select-String "Subtitle").count
-    if (($UsunNapisy -eq "true") -and ($IleNapisow -ne 0))
+    $HowManySubtitles = (ffmpeg -i $File 2>&1 | Select-String "Subtitle").count
+    if (($RemoveSubtitles -eq "true") -and ($HowManySubtitles -ne 0))
     {
-        ffmpeg -i $Plik -c copy -sn "file:output.mkv" -loglevel error
-        del $Plik
-        mv output.mkv $Plik
-        $IleNapisow = 0
+        ffmpeg -i $File -c copy -sn "file:output.mkv" -loglevel error
+        del $File
+        mv output.mkv $File
+        $HowManySubtitles = 0
     }
-    $Plik = $Plik.Substring(0,$Plik.Length-4)
-    if ((Test-Path "$($Sciezka)`\$($Plik).$($rozv)" -PathType Leaf) -and (Test-Path "$($Sciezka)`\$($Plik).$($rozs)" -PathType Leaf))
+    $File = $File.Substring(0,$File.Length-4)
+    if ((Test-Path "$($DirPath)`\$($File).$($extv)" -PathType Leaf) -and (Test-Path "$($DirPath)`\$($File).$($exts)" -PathType Leaf))
     {
-        $PlikMkv = "$($Plik).$($rozv)"
-        $PlikSrt = "$($Plik).$($rozs)"
-        $PlikAss = "$($Plik).ass"
-        Write-Host "Pliki Istnieja"
-        Write-Host "Przetwarzanie: `t$($PlikMkv)"
-        Write-Host "Przetwarzanie: `t$($PlikSrt)"
-        Write-Host "Konwertowanie napisow do formatu ASS"
-        ZmianaJezyka("pol")
+        $FileMkv = "$($File).$($extv)"
+        $FileSrt = "$($File).$($exts)"
+        $FileAss = "$($File).ass"
+        Write-Host "File Exists"
+        Write-Host "Processing: `t$($FileMkv)"
+        Write-Host "Processing: `t$($FileSrt)"
+        Write-Host "Converting Subtitles to ASS format"
+        ChangeSubtitleMetadataLang("pol")
         Write-host "$($MetadataLanguage)`t$($MetadataHandlerName)`t$($MetadataTitle)"
-        ffmpeg -sub_charenc UTF-8 -i $PlikSrt "file:$($PlikAss)" -loglevel error #-sub_charenc UTF-8 -sub_charenc CP1250
-        if ($IleNapisow -ne 0) 
+        ffmpeg -sub_charenc UTF-8 -i $FileSrt "file:$($FileAss)" -loglevel error #-sub_charenc UTF-8 -sub_charenc CP1250
+        if ($HowManySubtitles -ne 0) 
         {
-            Write-Host "Plik $($PlikMkv) ma juz napisy w ilosci: $($IleNapisow)"
-            $PozycjaDomyslnychNapisow = ZnajdzPozycjeDomyslnychNapisow($PlikMkv)
-            Write-Host "Pozycja Domyslnych: `t $($PozycjaDomyslnychNapisow), Ile Napisow: `t$($IleNapisow)"
-            $Metadata = "-metadata:s:s:$($IleNapisow)"
-            ffmpeg -i $PlikMkv -i $PlikAss -map 0 -c copy -map "1:0" $Metadata $MetadataLanguage $Metadata $MetadataHandlerName $Metadata $MetadataTitle -disposition:s:s:$IleNapisow default -disposition:s:s:$PozycjaDomyslnychNapisow 0 "file:output.mkv" -loglevel error #-disposition:s:s:$IleNapisow default -disposition:s:s:$PozycjaDomyslnychNapisow 0
+            Write-Host "File $($FileMkv) has already subtitles: $($HowManySubtitles)"
+            $DefaultSubtitlesPosition = FindPositionOfDefaultSubtitles($FileMkv)
+            Write-Host "Posiition of Default: `t $($DefaultSubtitlesPosition), How many subtitles: `t$($HowManySubtitles)"
+            $Metadata = "-metadata:s:s:$($HowManySubtitles)"
+            ffmpeg -i $FileMkv -i $FileAss -map 0 -c copy -map "1:0" $Metadata $MetadataLanguage $Metadata $MetadataHandlerName $Metadata $MetadataTitle -disposition:s:$HowManySubtitles default -disposition:s:$DefaultSubtitlesPosition 0 "file:output.mkv" -loglevel error #-disposition:s:s:$HowManySubtitles default -disposition:s:s:$DefaultSubtitlesPosition 0
         }
         else
         {
-            $Metadata = "-metadata:s:s:$($IleNapisow)"
-            ffmpeg -i $PlikMkv -i $PlikAss -map 0 -c copy -map "1:0" $Metadata $MetadataLanguage $Metadata $MetadataHandlerName $Metadata $MetadataTitle -disposition:s:s:$IleNapisow default "file:output.mkv" -loglevel error #-disposition:s:0 0 
+            $Metadata = "-metadata:s:s:$($HowManySubtitles)"
+            ffmpeg -i $FileMkv -i $FileAss -map 0 -c copy -map "1:0" $Metadata $MetadataLanguage $Metadata $MetadataHandlerName $Metadata $MetadataTitle -disposition:s:$HowManySubtitles default "file:output.mkv" -loglevel error #-disposition:s:0 0 
         }
-#        del $PlikMkv
-#        del $PlikSrt
-#        del $PlikAss
-        mv output.mkv "2$($PlikMkv)"
+        if ($DeleteSourceFiles -ne 0)
+        {
+            del $FileMkv
+            del $FileSrt
+            del $FileAss
+            mv output.mkv "$($FileMkv)"
+        }
+        else {mv output.mkv "$($FileMkv)_output"}
     }
     else 
     {
-        if ($UsunNapisy -eq "false") {Write-host "Jeden z dwoch wymaganych plikow nie istnieje"}
-        else {Write-Host "Usunieto napisy z pliku $($Plik)"}
+        if ($RemoveSubtitles -eq "false") {Write-host "One of two required files doesn't exist"}
+        else {Write-Host "Subtitles has been removed from file: $($File)"}
     }
 }
