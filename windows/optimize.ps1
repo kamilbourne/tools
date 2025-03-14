@@ -115,7 +115,7 @@ while ($allgood -eq $false -and $OptionsSwitch[0].WinNews)
 {
     if ($SystemVersion -ge 10)
     {
-        $RegistryPath = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\DSH'
+        $RegistryPath = 'HKLM:\SOFTWARE\Policies\Microsoft\DSH'
         $Name         = 'AllowNewsAndInterests'
         $Value        = $OptionsSwitch[0].WinNewsValue
         If (-NOT (Test-Path $RegistryPath)) 
