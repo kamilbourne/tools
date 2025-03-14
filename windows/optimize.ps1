@@ -13,6 +13,8 @@ $OptionsSwitch=
         WinNews = $true;
         WinNewsValue = 0;
         WinAutoStart = $true;
+        WinTasks = $true;
+        WinSchedule = $true;
     }
 )
 $allgood = $false
@@ -112,6 +114,7 @@ while ($allgood -eq $false -and $OptionsSwitch[0].WinUpdates)
 }
 #Disable Autostart Of the Apps
 if ($SystemVersion -ge 6 -and $OptionsSwitch[0].WinAutoStart)
+{
     $RegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
     $Name         = 'OneDrive'
         if(-NOT (Get-ItemProperty -Path $RegistryPath -Name $Name -ErrorAction SilentlyContinue))
@@ -123,7 +126,6 @@ if ($SystemVersion -ge 6 -and $OptionsSwitch[0].WinAutoStart)
             Remove-ItemProperty -Path $RegistryPath -Name $Name
             Write-Host "Wylaczono autostrat OneDrive"
         }
-    }
     $Name         = 'MicrosoftEdgeAutoLaunch*'
         if(-NOT (Get-ItemProperty -Path $RegistryPath -Name $Name -ErrorAction SilentlyContinue))
         {
@@ -140,3 +142,13 @@ elseif ($SystemVersion -lt 6)
     Write-Host "Winddows xp chyba do tego jest wymagany"
 }
 else {Write-Host "Nie wylaczamy nic z auotstartu lecimy dalej"}
+#Disable Schedulled Tasks like windows defrag!
+if ($SystemVersion -ge 6 -and $OptionsSwitch[0].WinSchedule)
+{
+    if (Get-ScheduledTask ScheduledDefrag -ErrorAction SilentlyContinue) {Unregister-ScheduledTask -TaskName "ScheduledDefrag" -TaskPath "\Microsoft\Windows\Defrag\" -Confirm:$false} #disable defrag
+}
+elseif ($SystemVersion -lt 6)
+{
+    Write-Host "Winddows xp chyba do tego jest wymagany"
+}
+else {Write-Host "Nie wylaczamy z zadan"}
