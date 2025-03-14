@@ -12,6 +12,7 @@ $OptionsSwitch=
         WinUpdatesValue = 2; #2 - ask before download and install, 3 - auto download, ask before install, 4 - auto download and schedule install, 5 - local admin to choose
         WinNews = $true;
         WinNewsValue = 0;
+        WinAutoStart = $true;
     }
 )
 $allgood = $false
@@ -109,49 +110,33 @@ while ($allgood -eq $false -and $OptionsSwitch[0].WinUpdates)
         $allgood = $true
     }
 }
-#Disable NewsFeed
-$allgood = $false
-while ($allgood -eq $false -and $OptionsSwitch[0].WinNews)
-{
-    if ($SystemVersion -ge 10)
-    {
-        $RegistryPath = 'HKLM:\SOFTWARE\Policies\Microsoft\DSH'
-        $Name         = 'AllowNewsAndInterests'
-        $Value        = $OptionsSwitch[0].WinNewsValue
-        If (-NOT (Test-Path $RegistryPath)) 
+#Disable Autostart Of the Apps
+if ($SystemVersion -ge 6 -and $OptionsSwitch[0].WinAutoStart)
+    $RegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+    $Name         = 'OneDrive'
+        if(-NOT (Get-ItemProperty -Path $RegistryPath -Name $Name -ErrorAction SilentlyContinue))
         {
-            Write-Host "Sciezka nie istnieje"
-            New-Item -Path $RegistryPath -Force | Out-Null
-            Write-Host "Sciezka $($RegistryPath) utworzona"
-        }  
+            Write-host "One Drive juz byl wylaczony" 
+        }
         else 
         {
-            if(-NOT (Get-ItemProperty -Path $RegistryPath -Name $Name -ErrorAction SilentlyContinue))
-            {
-                Write-Host "Wpis nie istnieje"
-                New-ItemProperty -Path $RegistryPath -Name $Name -Value $Value -PropertyType DWORD -Force
-                Write-Host "Wpis $($RegistryPath)\$($Name) utworzony"
-                $allgood = $true
-            }
-            else 
-            {
-                if ((Get-ItemProperty -Path $RegistryPath | Select-Object -ExpandProperty $Name -ErrorAction SilentlyContinue) -ne $Value)
-                {
-                    Write-Host "Wartosc Nie jest ustawiona pod wiadomosci tak jak chcesz, zmieniono ;)"
-                    Set-ItemProperty -Path $RegistryPath -Name $Name -Value $Value -Force 
-                    $allgood = $true
-                }
-                else 
-                {
-                    Write-Host "Windows News juz byl ustawiony"
-                    $allgood = $true
-                }
-            }
+            Remove-ItemProperty -Path $RegistryPath -Name $Name
+            Write-Host "Wylaczono autostrat OneDrive"
         }
     }
-    else
-    {
-        Write-Host "Windows 10 lub wyzej wymagany lecimy dalej"
-        $allgood = $true
-    }
+    $Name         = 'MicrosoftEdgeAutoLaunch*'
+        if(-NOT (Get-ItemProperty -Path $RegistryPath -Name $Name -ErrorAction SilentlyContinue))
+        {
+            Write-host "Autosatrt Edge juz byl wylaczony" 
+        }
+        else 
+        {
+            Remove-ItemProperty -Path $RegistryPath -Name $Name
+            Write-Host "Wylaczono autostrat Edge"
+        }
 }
+elseif ($SystemVersion -lt 6)
+{
+    Write-Host "Winddows xp chyba do tego jest wymagany"
+}
+else {Write-Host "Nie wylaczamy nic z auotstartu lecimy dalej"}
